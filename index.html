@@ -14,7 +14,7 @@
   <script>
     window.ADSGRAM_BLOCK_ID = "56699";
 
-    // Автоматическая подстановка реального Block ID, если передан int-0
+    // Автоматическая подстановка реального Block ID и гарантированная доставка награды в Unity
     function patchAdsgram() {
       if (window.Adsgram && !window.Adsgram._isPatched) {
         const origInit = window.Adsgram.init.bind(window.Adsgram);
@@ -23,7 +23,28 @@
           if (!opts.blockId || opts.blockId === "int-0") {
             opts.blockId = window.ADSGRAM_BLOCK_ID || "56699";
           }
-          return origInit(opts);
+          const controller = origInit(opts);
+          const origShow = controller.show.bind(controller);
+          controller.show = function() {
+            return origShow().then(function(result) {
+              console.log("[Adsgram] Ad completed, sending reward to Unity:", result);
+              var u = window.unityInstance || (typeof unityInstance !== "undefined" ? unityInstance : null);
+              if (u && typeof u.SendMessage === "function") {
+                try { u.SendMessage("[PlatformSDK]", "OnAdsgramSuccess", "reward"); } catch(e) {}
+                try { u.SendMessage("[PlatformSDK]", "OnAdsgramSuccess", ""); } catch(e) {}
+              }
+              return result;
+            }).catch(function(err) {
+              console.warn("[Adsgram] Ad closed or failed:", err);
+              var u = window.unityInstance || (typeof unityInstance !== "undefined" ? unityInstance : null);
+              if (u && typeof u.SendMessage === "function") {
+                try { u.SendMessage("[PlatformSDK]", "OnAdsgramFail", "fail"); } catch(e) {}
+                try { u.SendMessage("[PlatformSDK]", "OnAdsgramFail", ""); } catch(e) {}
+              }
+              throw err;
+            });
+          };
+          return controller;
         };
         window.Adsgram._isPatched = true;
       }
