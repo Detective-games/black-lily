@@ -12,6 +12,25 @@
   <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
 
   <script>
+    window.ADSGRAM_BLOCK_ID = "56699";
+
+    // Автоматическая подстановка реального Block ID, если передан int-0
+    function patchAdsgram() {
+      if (window.Adsgram && !window.Adsgram._isPatched) {
+        const origInit = window.Adsgram.init.bind(window.Adsgram);
+        window.Adsgram.init = function(opts) {
+          opts = opts || {};
+          if (!opts.blockId || opts.blockId === "int-0") {
+            opts.blockId = window.ADSGRAM_BLOCK_ID || "56699";
+          }
+          return origInit(opts);
+        };
+        window.Adsgram._isPatched = true;
+      }
+    }
+    patchAdsgram();
+    document.addEventListener("DOMContentLoaded", patchAdsgram);
+    window.addEventListener("load", patchAdsgram);
     if (window.Telegram && window.Telegram.WebApp) {
       try {
         Telegram.WebApp.ready();
