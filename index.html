@@ -14,7 +14,6 @@
   <script>
     window.ADSGRAM_BLOCK_ID = "56699";
 
-    // Автоматическая подстановка реального Block ID и гарантированная доставка награды в Unity
     function patchAdsgram() {
       if (window.Adsgram && !window.Adsgram._isPatched) {
         const origInit = window.Adsgram.init.bind(window.Adsgram);
@@ -30,6 +29,8 @@
               console.log("[Adsgram] Ad completed, sending reward to Unity:", result);
               var u = window.unityInstance || (typeof unityInstance !== "undefined" ? unityInstance : null);
               if (u && typeof u.SendMessage === "function") {
+                try { u.SendMessage("[TelegramSDK]", "OnAdsgramSuccess", "reward"); } catch(e) {}
+                try { u.SendMessage("[TelegramSDK]", "OnAdsgramSuccess", ""); } catch(e) {}
                 try { u.SendMessage("[PlatformSDK]", "OnAdsgramSuccess", "reward"); } catch(e) {}
                 try { u.SendMessage("[PlatformSDK]", "OnAdsgramSuccess", ""); } catch(e) {}
               }
@@ -38,6 +39,8 @@
               console.warn("[Adsgram] Ad closed or failed:", err);
               var u = window.unityInstance || (typeof unityInstance !== "undefined" ? unityInstance : null);
               if (u && typeof u.SendMessage === "function") {
+                try { u.SendMessage("[TelegramSDK]", "OnAdsgramFail", "fail"); } catch(e) {}
+                try { u.SendMessage("[TelegramSDK]", "OnAdsgramFail", ""); } catch(e) {}
                 try { u.SendMessage("[PlatformSDK]", "OnAdsgramFail", "fail"); } catch(e) {}
                 try { u.SendMessage("[PlatformSDK]", "OnAdsgramFail", ""); } catch(e) {}
               }
@@ -155,13 +158,93 @@
   <div id="unity-container" class="unity-desktop">
     <canvas id="unity-canvas"></canvas>
   </div>
-  <div id="loading-cover" style="display:none;">
-    <div id="unity-loading-bar">
-      <div id="unity-logo" style="display: none;"><img src="logo.png"></div>
-      <div id="unity-progress-bar-empty" style="display: none;">
-        <div id="unity-progress-bar-full"></div>
+  <div id="loading-cover">
+    <!-- Атмосферный фон улицы в тумане -->
+    <div class="loader-bg"></div>
+    <div class="loader-vignette-top"></div>
+    <div class="loader-vignette-bottom"></div>
+
+    <!-- Область пути детектива -->
+    <div class="loader-track-area">
+      <div class="pavement-line"></div>
+
+      <!-- Контейнер для следов (открывается по мере загрузки) -->
+      <div class="footsteps-container">
+        <div id="footsteps-reveal" class="footsteps-reveal">
+          <svg width="100%" height="36" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="blood-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="0" stdDeviation="1.5" flood-color="#ff1e1e" flood-opacity="0.8"/>
+              </filter>
+              <pattern id="footsteps-pattern" width="56" height="36" patternUnits="userSpaceOnUse">
+                <!-- Левый след -->
+                <ellipse cx="12" cy="11" rx="5.5" ry="3.2" fill="#c41414" transform="rotate(-6 12 11)" filter="url(#blood-glow)"/>
+                <ellipse cx="19" cy="10" rx="3.5" ry="2.2" fill="#9e0c0c" transform="rotate(-6 19 10)"/>
+                <circle cx="7" cy="12" r="1.2" fill="#d41818" opacity="0.8"/>
+                <!-- Правый след -->
+                <ellipse cx="40" cy="23" rx="5.5" ry="3.2" fill="#c41414" transform="rotate(6 40 23)" filter="url(#blood-glow)"/>
+                <ellipse cx="47" cy="24" rx="3.5" ry="2.2" fill="#9e0c0c" transform="rotate(6 47 24)"/>
+                <circle cx="35" cy="22" r="1.2" fill="#d41818" opacity="0.8"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="36" fill="url(#footsteps-pattern)"/>
+          </svg>
+        </div>
       </div>
-      <div class="spinner"></div>
+
+      <!-- Идущий силуэт детектива -->
+      <div id="detective-mover" class="detective-mover">
+        <svg class="detective-svg" viewBox="0 0 70 120" xmlns="http://www.w3.org/2000/svg">
+          <!-- Шляпа федора -->
+          <ellipse cx="40" cy="16" rx="20" ry="4" fill="#111114" transform="rotate(-8 40 16)"/>
+          <path d="M 28 15 C 28 8, 33 5, 42 6 C 50 7, 51 12, 51 15 Z" fill="#18181d"/>
+          <rect x="30" y="13" width="20" height="2.5" fill="#32323a"/>
+          <!-- Голова и профиль лица -->
+          <path d="M 37 17 C 43 18, 47 22, 45 28 C 43 31, 38 32, 34 30 Z" fill="#1d1d23"/>
+          <path d="M 45 23 L 49 26 L 44 28 Z" fill="#141418"/>
+          <!-- Воротник плаща -->
+          <path d="M 30 28 L 46 29 L 51 38 L 42 38 L 36 43 L 28 35 Z" fill="#15151a"/>
+          <!-- Плащ и торс -->
+          <path d="M 31 35 C 38 35, 48 40, 48 55 C 48 70, 56 82, 54 88 C 50 90, 40 88, 30 88 C 22 84, 18 65, 23 48 C 26 40, 28 36, 31 35 Z" fill="#101014"/>
+          <path d="M 42 38 L 47 52 L 40 68 L 38 52 Z" fill="#202027" opacity="0.6"/>
+          <!-- Полы плаща -->
+          <path d="M 22 62 C 16 72, 12 80, 16 85 C 22 87, 28 86, 30 84 Z" fill="#0d0d10"/>
+          <!-- Передняя нога (шаг вперёд) -->
+          <path d="M 40 84 L 52 104 L 50 114 L 62 116 L 62 118 L 46 118 L 44 105 L 36 85 Z" fill="#131317"/>
+          <!-- Задняя нога (шаг назад) -->
+          <path d="M 28 84 L 20 102 L 15 110 L 23 114 L 21 116 L 10 114 L 14 105 L 24 84 Z" fill="#0b0b0e"/>
+          <!-- Рука в кармане плаща -->
+          <path d="M 35 42 C 42 46, 46 54, 45 62 C 44 68, 41 70, 37 68 C 34 65, 33 55, 33 46 Z" fill="#17171d"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Нижняя панель: статус загрузки и барабан револьвера -->
+    <div class="loader-footer">
+      <div class="loader-status">
+        <span class="loader-title">Загрузка...</span>
+        <span id="loader-percent" class="loader-percent">0%</span>
+      </div>
+
+      <!-- Вращающийся 6-зарядный барабан револьвера -->
+      <svg class="revolver-cylinder" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="46" fill="#23252a" stroke="#484d56" stroke-width="4"/>
+        <circle cx="50" cy="50" r="41" fill="none" stroke="#16171a" stroke-width="2"/>
+        <circle cx="50" cy="50" r="10" fill="#121316" stroke="#4f545f" stroke-width="3"/>
+        <circle cx="50" cy="50" r="4" fill="#6c7382"/>
+        <circle cx="50" cy="22" r="9" fill="#0e0f12" stroke="#3e424c" stroke-width="2"/>
+        <circle cx="50" cy="22" r="4" fill="#997736" opacity="0.9"/>
+        <circle cx="74.2" cy="36" r="9" fill="#0e0f12" stroke="#3e424c" stroke-width="2"/>
+        <circle cx="74.2" cy="36" r="4" fill="#997736" opacity="0.9"/>
+        <circle cx="74.2" cy="64" r="9" fill="#0e0f12" stroke="#3e424c" stroke-width="2"/>
+        <circle cx="74.2" cy="64" r="4" fill="#997736" opacity="0.9"/>
+        <circle cx="50" cy="78" r="9" fill="#0e0f12" stroke="#3e424c" stroke-width="2"/>
+        <circle cx="50" cy="78" r="4" fill="#997736" opacity="0.9"/>
+        <circle cx="25.8" cy="64" r="9" fill="#0e0f12" stroke="#3e424c" stroke-width="2"/>
+        <circle cx="25.8" cy="64" r="4" fill="#997736" opacity="0.9"/>
+        <circle cx="25.8" cy="36" r="9" fill="#0e0f12" stroke="#3e424c" stroke-width="2"/>
+        <circle cx="25.8" cy="36" r="4" fill="#997736" opacity="0.9"/>
+      </svg>
     </div>
   </div>
 
@@ -266,12 +349,25 @@
     unityLoader.src = loaderUrl;
     unityLoader.onload = async () => {
       createUnityInstance(canvas, config, (progress) => {
-        spinner.style.display = "none";
-        progressBarEmpty.style.display = "";
-        progressBarFull.style.width = `${100 * progress}%`;
+        const pct = Math.min(100, Math.max(0, progress * 100));
+        const footsteps = document.getElementById("footsteps-reveal");
+        const mover = document.getElementById("detective-mover");
+        const percentText = document.getElementById("loader-percent");
+
+        if (footsteps) {
+          footsteps.style.clipPath = `inset(0 calc(100% - ${pct}%) 0 0)`;
+        }
+        if (mover) {
+          mover.style.left = `calc(${pct * 0.86}% - 20px)`;
+        }
+        if (percentText) {
+          percentText.textContent = `${Math.round(pct)}%`;
+        }
       }).then((unityInstance) => {
         window.unityInstance = unityInstance;
-        loadingCover.style.display = "none";
+        loadingCover.style.transition = "opacity 0.6s ease";
+        loadingCover.style.opacity = "0";
+        setTimeout(() => { loadingCover.style.display = "none"; }, 600);
       }).catch((message) => {
         if (isGpExpectedRejection(message)) return;
         alert(message);
